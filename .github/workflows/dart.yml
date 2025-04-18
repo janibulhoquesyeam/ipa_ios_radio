@@ -7,6 +7,7 @@ jobs:
   build-ios:
     name: 🎉 iOS Build
     runs-on: macos-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -14,23 +15,42 @@ jobs:
         with:
           channel: 'stable'
           architecture: x64
-      - run: flutter pub get
-      
 
-      - run: pod repo update
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Delete Podfile.lock (if exists)
+        run: |
+          if [ -f ios/Podfile.lock ]; then
+            rm ios/Podfile.lock
+          fi
+
+      - name: Set up Ruby for CocoaPods
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+
+      - name: Install CocoaPods
+        run: sudo gem install cocoapods
+
+      - name: Install Pods (with repo update)
         working-directory: ios
+        run: pod install --repo-update
 
-      - run: flutter build ios --release --no-codesign
+      - name: Build iOS app (no code signing)
+        run: flutter build ios --release --no-codesign
 
-      - run: mkdir Payload
+      - name: Create Payload folder
         working-directory: build/ios/iphoneos
+        run: mkdir Payload
 
-      - run: mv Runner.app/ Payload
+      - name: Move app to Payload
         working-directory: build/ios/iphoneos
+        run: mv Runner.app Payload/
 
-      - name: Zip output
+      - name: Zip IPA
+        working-directory: build/ios/iphoneos
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
-        working-directory: build/ios/iphoneos
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
